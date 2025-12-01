@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "Compilar Bomberman",
+            "command": "g++",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                // 1. Compilar todos los archivos .cpp en src
+                "${workspaceFolder}/src/main.cpp",
+                "${workspaceFolder}/src/Map.cpp", 
+                "${workspaceFolder}/src/Player.cpp",
+                // 2. Incluir la carpeta de cabeceras (.h)
+                "-I${workspaceFolder}/include",
+                // 3. Salida en la carpeta bin
+                "-o",
+                "${workspaceFolder}/bin/Bomberman.exe",
+                // 4. Librerías de SFML (necesarias para ventana y gráficos)
+                "-lsfml-graphics",
+                "-lsfml-window",
+                "-lsfml-system"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/bin"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Compilador detectado: MSYS2 MinGW64"
+        }
+    ]
+}
