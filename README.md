@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Bomberman II - 1v1
 
 Un juego competitivo de Bomberman para dos jugadores donde solo uno puede sobrevivir.
@@ -107,3 +108,6 @@ Proyecto educativo basado en el clásico Bomberman de NES.
 ---
 
 **¡Que gane el mejor!** 💣
+=======
+# PROFE PONGAME 100
+>>>>>>> 641757c8aad6b23f02c2c942024a8971baa49360
