@@ -1,189 +1,228 @@
 #include "Player.h"
 #include "Map.h"
 #include <iostream>
+#include <cmath> // Para abs()
 
-Player::Player() {
-    speed = 2.5f; // Tu velocidad personalizada
+Player::Player(int id) : playerId(id) {
+    health = 1;
+    isAlive = true;
+    speed = 4.0f; 
 
-    // 1. Cargar imagen
     sf::Image image;
     if (!image.loadFromFile("assets/NES-Bomberman-II-Miscellaneous-Bomberman-_-Enemies.png")) {
-        std::cerr << "Error cargando sprite de Bomberman" << std::endl;
+        std::cerr << "Error cargando sprite" << std::endl;
     }
 
-    // 2. Máscara de transparencia
     image.createMaskFromColor(sf::Color(255, 0, 255));
-
-    // 3. Textura
     texture.loadFromImage(image);
     sprite.setTexture(texture);
 
-    // 4. Recorte Inicial (Tus coordenadas)
     sprite.setTextureRect(sf::IntRect(10, 3, 17, 24)); 
-
-    // 5. Configuración visual (TUS VALORES PERSONALIZADOS)
     sprite.setOrigin(8.5f, 12.0f);
 
-    // 6. Posición Inicial
-    sprite.setPosition(1.5f * TILE_SIZE * SCALE, 1.5f * TILE_SIZE * SCALE); 
+    // Posición inicial diferente para cada jugador
+    if (playerId == 0) {
+        // Jugador 1 en esquina superior izquierda
+        sprite.setPosition(1.5f * TILE_SIZE * SCALE, 1.5f * TILE_SIZE * SCALE);
+    } else {
+        // Jugador 2: mover una celda a la derecha y una celda hacia abajo respecto a la esquina
+        sprite.setPosition((MAP_WIDTH - 1.5f) * TILE_SIZE * SCALE, (MAP_HEIGHT - 1.5f) * TILE_SIZE * SCALE);
+    }
+    
     sprite.setScale(SCALE, SCALE); 
 
-    // --- INICIALIZACIÓN DE ANIMACIÓN ---
+    targetPosition = sprite.getPosition();
+    isMoving = false;
+
     currentFrame = 0;
-    
-    // CAMBIO: Aumentamos a 4 frames para el ciclo de caminar (Quieto-Pie1-Quieto-Pie2)
     numFrames = 4;     
-    
     currentDir = DOWN; 
     updateSpriteTexture(); 
 }
 
 void Player::update(Map& map) {
-    sf::Vector2f movement(0.f, 0.f);
-    bool isMoving = false; 
-
-    // 1. DETECTAR INPUT
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
-        movement.y -= speed;
-        currentDir = UP;
-        isMoving = true;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
-        movement.y += speed;
-        currentDir = DOWN;
-        isMoving = true;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
-        movement.x -= speed;
-        currentDir = LEFT;
-        isMoving = true;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
-        movement.x += speed;
-        currentDir = RIGHT;
-        isMoving = true;
-    }
-
-    // 2. MOVER Y COLISIONES
-    if (movement.x != 0) {
-        sprite.move(movement.x, 0);
-        if (checkCollision(map)) sprite.move(-movement.x, 0);
-    }
-    if (movement.y != 0) {
-        sprite.move(0, movement.y);
-        if (checkCollision(map)) sprite.move(0, -movement.y);
-    }
-
-    // 3. LÓGICA DE ANIMACIÓN MEJORADA
+    
+    if (!isAlive) return;
+    
+    // --- FASE 1: SI YA ESTAMOS CAMINANDO, SEGUIMOS CAMINANDO ---
     if (isMoving) {
-        // Velocidad de animación (ajustada para 4 frames)
+        sf::Vector2f currentPos = sprite.getPosition();
+        sf::Vector2f direction = targetPosition - currentPos;
+        float distance = std::sqrt(direction.x*direction.x + direction.y*direction.y);
+
+        // Si estamos muy cerca (menos de un paso), llegamos.
+        if (distance <= speed) {
+            sprite.setPosition(targetPosition); // "Snap" exacto al destino
+            isMoving = false; // Dejamos de caminar
+        } else {
+            // Normalizar dirección y mover
+            // Como movemos en linea recta ortogonal, basta con sumar speed
+            if (direction.x > 0) sprite.move(speed, 0);
+            else if (direction.x < 0) sprite.move(-speed, 0);
+            else if (direction.y > 0) sprite.move(0, speed);
+            else if (direction.y < 0) sprite.move(0, -speed);
+        }
+
+        // ANIMAR MIENTRAS SE MUEVE
         if (animationClock.getElapsedTime().asSeconds() > 0.12f) {
             currentFrame++;
-            if (currentFrame >= numFrames) {
-                currentFrame = 0; 
-            }
+            if (currentFrame >= numFrames) currentFrame = 0;
             animationClock.restart();
-            updateSpriteTexture(); 
-        }
-    } else {
-        if (currentFrame != 0) {
-            currentFrame = 0;
             updateSpriteTexture();
+        }
+    }
+    
+    // --- FASE 2: SI ESTAMOS QUIETOS, LEEMOS INPUT PARA DAR EL SIGUIENTE PASO ---
+    else {
+        sf::Vector2f nextStep(0.f, 0.f);
+        bool keyPressed = false;
+
+        // Controles diferentes según el ID del jugador
+        if (playerId == 0) {
+            // Jugador 1: Flechas
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
+                nextStep.y = -TILE_SIZE * SCALE;
+                currentDir = UP;
+                keyPressed = true;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
+                nextStep.y = TILE_SIZE * SCALE;
+                currentDir = DOWN;
+                keyPressed = true;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
+                nextStep.x = -TILE_SIZE * SCALE;
+                currentDir = LEFT;
+                keyPressed = true;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
+                nextStep.x = TILE_SIZE * SCALE;
+                currentDir = RIGHT;
+                keyPressed = true;
+            }
+        } else {
+            // Jugador 2: WASD
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+                nextStep.y = -TILE_SIZE * SCALE;
+                currentDir = UP;
+                keyPressed = true;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+                nextStep.y = TILE_SIZE * SCALE;
+                currentDir = DOWN;
+                keyPressed = true;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+                nextStep.x = -TILE_SIZE * SCALE;
+                currentDir = LEFT;
+                keyPressed = true;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+                nextStep.x = TILE_SIZE * SCALE;
+                currentDir = RIGHT;
+                keyPressed = true;
+            }
+        }
+
+        // Si se presionó algo, verificamos si es válido moverse ahí
+        if (keyPressed) {
+            // Actualizamos la textura para encarar la dirección INMEDIATAMENTE
+            updateSpriteTexture();
+
+            // Calculamos la coordenada del tile objetivo
+            sf::Vector2f potentialTarget = sprite.getPosition() + nextStep;
+            
+            int gridX = static_cast<int>(potentialTarget.x / (TILE_SIZE * SCALE));
+            int gridY = static_cast<int>(potentialTarget.y / (TILE_SIZE * SCALE));
+
+            // PREGUNTAMOS AL MAPA: ¿Es suelo (0)?
+            if (map.getTile(gridX, gridY) == 0) {
+                targetPosition = potentialTarget; // Fijamos destino
+                isMoving = true; // Iniciamos viaje
+            } else {
+                // Si es pared, no hacemos nada (se queda quieto mirando a la pared)
+            }
+        } else {
+            // Si no presiona nada, reseteamos a frame quieto
+            if (currentFrame != 0) {
+                currentFrame = 0;
+                updateSpriteTexture();
+            }
         }
     }
 }
 
-// AQUÍ ESTÁ LA INTEGRACIÓN DE TUS COORDENADAS CON LA NUEVA LÓGICA
 void Player::updateSpriteTexture() {
     int width = 17; 
     int height = 24;
     int yPos = 3; 
     int xPos = 0;
-
-    // Tu frameStep personalizado
     int frameStep = 19;
 
-    // Reiniciamos escala a normal por defecto
     sprite.setScale(SCALE, SCALE); 
 
     if (currentDir == DOWN) {
-        // Tu coordenada base: 10
         int basePos = 10;
-        int drawIndex = 0; // Frame 0 y 2 dibujan el índice 0 (Quieto)
-
-        if (currentFrame == 1) {
-            drawIndex = 1; // Frame 1 dibuja índice 1 (Pie derecho)
-        }
-        if (currentFrame == 3) {
-            drawIndex = 1; // Frame 3 dibuja índice 1...
-            sprite.setScale(-SCALE, SCALE); // ...pero INVERTIDO (Pie izquierdo)
-        }
-
+        int drawIndex = 0; 
+        if (currentFrame == 1) drawIndex = 1; 
+        if (currentFrame == 3) { drawIndex = 1; sprite.setScale(-SCALE, SCALE); }
         xPos = basePos + (drawIndex * frameStep);
     }
     else if (currentDir == UP) {
-        // Tu coordenada base: 48
         int basePos = 48;
         int drawIndex = 0; 
-
         if (currentFrame == 1) drawIndex = 1; 
-        if (currentFrame == 3) {
-            drawIndex = 1; 
-            sprite.setScale(-SCALE, SCALE); // Inversión para caminar arriba
-        }
-
+        if (currentFrame == 3) { drawIndex = 1; sprite.setScale(-SCALE, SCALE); }
         xPos = basePos + (drawIndex * frameStep);
     }
     else if (currentDir == RIGHT) {
-        // Tu coordenada base: 106
-        // Usamos % 3 porque los lados tienen 3 dibujos únicos, no necesitan inversión de frame
         int sideFrame = currentFrame % 3; 
-        
         xPos = 106 + (sideFrame * frameStep);
-        
-        // RESPETANDO TU LÓGICA: Derecha usa escala negativa
         sprite.setScale(-SCALE, SCALE);
     }
     else if (currentDir == LEFT) {
-        // Tu coordenada base: 106
         int sideFrame = currentFrame % 3;
-        
         xPos = 106 + (sideFrame * frameStep);
-        
-        // RESPETANDO TU LÓGICA: Izquierda usa escala positiva
         sprite.setScale(SCALE, SCALE); 
     }
 
     sprite.setTextureRect(sf::IntRect(xPos, yPos, width, height));
 }
 
-// TU COLISIÓN PERSONALIZADA (INTACTA)
-bool Player::checkCollision(Map& map) {
-    sf::Vector2f pos = sprite.getPosition();
-    
-    // TUS VALORES
-    float hitBoxX = 22.0f; 
-    float hitBoxY_Top = 24.0f; 
-    float footMargin = 22.0f; 
-
-    sf::Vector2f puntos[4];
-    puntos[0] = sf::Vector2f(pos.x - hitBoxX, pos.y - hitBoxY_Top);
-    puntos[1] = sf::Vector2f(pos.x + hitBoxX, pos.y - hitBoxY_Top);
-    puntos[2] = sf::Vector2f(pos.x - hitBoxX, pos.y + footMargin); 
-    puntos[3] = sf::Vector2f(pos.x + hitBoxX, pos.y + footMargin);
-
-    for (int i = 0; i < 4; i++) {
-        int gridX = static_cast<int>(puntos[i].x / (TILE_SIZE * SCALE));
-        int gridY = static_cast<int>(puntos[i].y / (TILE_SIZE * SCALE));
-        if (map.getTile(gridX, gridY) != 0) return true; 
-    }
-    return false;
-}
-
 void Player::draw(sf::RenderWindow& window) {
-    window.draw(sprite);
+    if (isAlive) {
+        window.draw(sprite);
+    }
 }
 
 sf::Vector2f Player::getPosition() {
     return sprite.getPosition();
+}
+
+int Player::getGridX() {
+    return static_cast<int>(sprite.getPosition().x / (TILE_SIZE * SCALE));
+}
+
+int Player::getGridY() {
+    return static_cast<int>(sprite.getPosition().y / (TILE_SIZE * SCALE));
+}
+
+int Player::getPlayerId() {
+    return playerId;
+}
+
+bool Player::getIsAlive() {
+    return isAlive;
+}
+
+void Player::takeDamage() {
+    health--;
+    if (health <= 0) {
+        isAlive = false;
+    }
+}
+
+void Player::setPosition(sf::Vector2f newPos) {
+    sprite.setPosition(newPos);
+    targetPosition = newPos;
 }

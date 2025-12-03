@@ -12,6 +12,10 @@
                 "${workspaceFolder}/src/main.cpp",
                 "${workspaceFolder}/src/Map.cpp", 
                 "${workspaceFolder}/src/Player.cpp",
+                "${workspaceFolder}/src/Bomb.cpp",
+                "${workspaceFolder}/src/Explosion.cpp",
+                "${workspaceFolder}/src/LoadingScreen.cpp",
+                "${workspaceFolder}/src/Menu.cpp",
                 // 2. Incluir la carpeta de cabeceras (.h)
                 "-I${workspaceFolder}/include",
                 // 3. Salida en la carpeta bin

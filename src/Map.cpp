@@ -67,3 +67,12 @@ int Map::getTile(int x, int y) {
     }
     return grid[y][x];
 }
+
+void Map::destroyTile(int x, int y) {
+    if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) {
+        return;
+    }
+    if (grid[y][x] == 2) { // Solo destroza bloques suaves
+        grid[y][x] = 0;
+    }
+}

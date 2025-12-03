@@ -1,31 +1,43 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 
-class Map; // Forward declaration
+// Forward declaration
+class Map;
 
-// Definimos direcciones para que sea fácil de leer
 enum Direction { DOWN, UP, LEFT, RIGHT };
 
 class Player {
 private:
+    int playerId; // 0 = Jugador 1 (Flechas), 1 = Jugador 2 (WASD)
     sf::Texture texture;
     sf::Sprite sprite;
     float speed;
     
-    // --- NUEVO: VARIABLES DE ANIMACIÓN ---
-    sf::Clock animationClock; // Reloj interno
-    int currentFrame;         // 0, 1, 2
-    int numFrames;            // Cuántos frames tiene la animación (3)
-    Direction currentDir;     // Hacia dónde mira
+    // --- VARIABLES DE ANIMACIÓN ---
+    sf::Clock animationClock;
+    int currentFrame;
+    int numFrames;
+    Direction currentDir;
 
-    bool checkCollision(Map& map);
-    
-    // Función privada para cambiar el recorte de la imagen
+    // --- VARIABLES DE MOVIMIENTO POR TILES ---
+    sf::Vector2f targetPosition;
+    bool isMoving;
+
+    // --- SALUD Y ESTADO ---
+    int health;
+    bool isAlive;
+
     void updateSpriteTexture();
 
 public:
-    Player();
+    Player(int id = 0); // 0 o 1
     void update(Map& map);
     void draw(sf::RenderWindow& window);
     sf::Vector2f getPosition();
+    int getGridX();
+    int getGridY();
+    int getPlayerId();
+    bool getIsAlive();
+    void takeDamage();
+    void setPosition(sf::Vector2f newPos);
 };

@@ -28,4 +28,7 @@ public:
     
     // Obtiene qué hay en una coordenada (0=suelo, 1=pared, etc.)
     int getTile(int x, int y);
+    
+    // Destruye un bloque suave
+    void destroyTile(int x, int y);
 };
