@@ -1,34 +1,27 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <vector>
+#include "Map.h"
 
 class Explosion {
 private:
-    sf::Clock displayTimer;
-    float displayDuration; // Cuánto tiempo se muestra la explosión
-    bool isActive;
+    // Parte Visual
+    std::vector<sf::RectangleShape> fireSegments;
     
-    // Lista de células de explosión (en coordenadas de grid)
+    // Parte Lógica (Coordenadas de la grid afectadas)
     std::vector<sf::Vector2i> explosionCells;
-    
-    // Sprite para dibujar
-    sf::Sprite sprite;
-    sf::Texture texture;
-    sf::Clock animClock;
-    int currentFrame;
-    int numFrames;
+
+    sf::Clock lifeTimer;
+    float duration;
 
 public:
-    Explosion(sf::Vector2f centerPosition, class Map& map);
+    Explosion(sf::Vector2f centerPos, Map& map);
     
     void update();
     void draw(sf::RenderWindow& window);
     
-    bool isExplosionActive();
-    bool isCellInExplosion(int gridX, int gridY);
-    const std::vector<sf::Vector2i>& getExplosionCells();
-    
-    // Coordenadas base en tileset (en píxeles)
-    int texBaseX;
-    int texBaseY;
+    // Funciones nuevas requeridas por main.cpp
+    bool isExplosionActive(); // Reemplaza a isFinished (invertido)
+    const std::vector<sf::Vector2i>& getExplosionCells(); // Para saber qué romper
+    bool isCellInExplosion(int gridX, int gridY); // Para saber si quemó al jugador
 };

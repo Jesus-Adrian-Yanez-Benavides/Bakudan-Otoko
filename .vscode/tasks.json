@@ -16,15 +16,17 @@
                 "${workspaceFolder}/src/Explosion.cpp",
                 "${workspaceFolder}/src/LoadingScreen.cpp",
                 "${workspaceFolder}/src/Menu.cpp",
+                "${workspaceFolder}/src/PowerUp.cpp",
                 // 2. Incluir la carpeta de cabeceras (.h)
                 "-I${workspaceFolder}/include",
                 // 3. Salida en la carpeta bin
                 "-o",
                 "${workspaceFolder}/bin/Bomberman.exe",
-                // 4. Librerías de SFML (necesarias para ventana y gráficos)
+                // 4. Librerías de SFML (necesarias para ventana, gráficos y audio)
                 "-lsfml-graphics",
                 "-lsfml-window",
-                "-lsfml-system"
+                "-lsfml-system",
+                "-lsfml-audio"
             ],
             "options": {
                 "cwd": "${workspaceFolder}/bin"

@@ -3,31 +3,25 @@
 
 class Bomb {
 private:
-    sf::Sprite sprite;
-    sf::Texture texture;
+    // Versión geométrica: Usamos un círculo
+    sf::CircleShape bombShape;
     
-    // Animación
-    sf::Clock animClock;
-    int currentFrame;
-    int numFrames;
-
-    // Temporizador de explosión
+    // Temporizadores
     sf::Clock fuseTimer;
     float timeToExplode;
     bool exploded;
 
-    // Coordenadas base en el tileset (en píxeles)
-    int texBaseX;
-    int texBaseY;
+    // Animación (color)
+    sf::Clock pulseTimer;
+    bool isRed;
 
 public:
     Bomb(sf::Vector2f position);
     
     void update();
     void draw(sf::RenderWindow& window);
-    
     bool hasExploded();
-    sf::Vector2f getPosition();
-    int getGridX();
-    int getGridY();
+
+    // --- ESTA ES LA LÍNEA QUE FALTABA ---
+    sf::Vector2f getPosition(); 
 };

@@ -7,7 +7,7 @@ Menu::Menu() {
     }
     sprite.setTexture(texture);
 
-    if (!font.loadFromFile("assets/font.ttf")) {
+    if (!font.loadFromFile("assets/Bomber Balloon.ttf")) {
         font.loadFromFile("C:\\Windows\\Fonts\\arial.ttf");
     }
 

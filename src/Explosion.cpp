@@ -1,162 +1,105 @@
 #include "Explosion.h"
-#include "Map.h"
-#include <iostream>
 #include <cmath>
 
-Explosion::Explosion(sf::Vector2f centerPosition, Map& map) {
-    // 1. CARGAR TEXTURA
-    sf::Image image;
-    if (!image.loadFromFile("assets/Bomb and Explotion.png")) {
-        std::cerr << "Error cargando textura para explosión" << std::endl;
-    }
-    image.createMaskFromColor(sf::Color(255, 0, 255));
-    // Buscar automáticamente el recorte de explosión alrededor de la sugerencia
-    int suggestedX = 352;
-    int suggestedY = 58;
-    unsigned int imgW = image.getSize().x;
-    unsigned int imgH = image.getSize().y;
+Explosion::Explosion(sf::Vector2f centerPos, Map& map) {
+    duration = 0.5f; 
+    float fireSize = TILE_SIZE * SCALE; 
+    sf::Vector2f sizeVec(fireSize, fireSize);
 
-    int foundX = suggestedX;
-    int foundY = suggestedY;
-    bool found = false;
-    for (int dy = -3; dy <= 3 && !found; ++dy) {
-        for (int dx = -3; dx <= 3 && !found; ++dx) {
-            int sx = suggestedX + dx * 16;
-            int sy = suggestedY + dy * 16;
-            if (sx < 0 || sy < 0) continue;
-            if ((unsigned)(sx + 16) > imgW || (unsigned)(sy + 16) > imgH) continue;
+    // Coordenadas de grid del centro
+    int gridX = static_cast<int>(centerPos.x / (TILE_SIZE * SCALE));
+    int gridY = static_cast<int>(centerPos.y / (TILE_SIZE * SCALE));
 
-            bool hasOpaque = false;
-            for (int yy = 0; yy < 16 && !hasOpaque; ++yy) {
-                for (int xx = 0; xx < 16; ++xx) {
-                    sf::Color c = image.getPixel(sx + xx, sy + yy);
-                    if (c.a != 0) { hasOpaque = true; break; }
-                }
+    // 1. GUARDAR CENTRO (Visual y Lógico)
+    sf::RectangleShape center(sizeVec);
+    center.setPosition(centerPos);
+    center.setOrigin(fireSize / 2.0f, fireSize / 2.0f);
+    center.setFillColor(sf::Color::Yellow);
+    fireSegments.push_back(center);
+
+    // ¡IMPORTANTE! Guardar la coordenada lógica del centro
+    explosionCells.push_back(sf::Vector2i(gridX, gridY));
+
+    // 2. CALCULAR BRAZOS
+    int range = 2; // Rango de explosión
+    int directions[4][2] = { {0, -1}, {0, 1}, {-1, 0}, {1, 0} };
+
+    for (int d = 0; d < 4; d++) {
+        for (int r = 1; r <= range; r++) {
+            int nextGridX = gridX + (directions[d][0] * r);
+            int nextGridY = gridY + (directions[d][1] * r);
+
+            // Consultar mapa
+            int tileType = map.getTile(nextGridX, nextGridY);
+
+            if (tileType == 1) { // Pared dura
+                break; 
             }
-            if (hasOpaque) {
-                foundX = sx;
-                foundY = sy;
-                found = true;
+            
+            // --- PARTE VISUAL ---
+            sf::RectangleShape armSegment(sizeVec);
+            float posX = nextGridX * TILE_SIZE * SCALE + (fireSize / 2.0f);
+            float posY = nextGridY * TILE_SIZE * SCALE + (fireSize / 2.0f);
+            
+            armSegment.setPosition(posX, posY);
+            armSegment.setOrigin(fireSize / 2.0f, fireSize / 2.0f);
+            armSegment.setFillColor(sf::Color(255, 69, 0)); 
+            
+            float scaleFactor = 1.0f - (r * 0.1f);
+            armSegment.setScale(scaleFactor, scaleFactor);
+            fireSegments.push_back(armSegment);
+
+            // --- PARTE LÓGICA (NUEVO) ---
+            // Guardamos que esta casilla está quemándose
+            explosionCells.push_back(sf::Vector2i(nextGridX, nextGridY));
+
+            if (tileType == 2) { // Pared blanda (Ladrillo)
+                // El fuego la golpea, la guardamos para destruirla, pero el fuego NO sigue avanzando
+                break; 
             }
-        }
-    }
-
-    texture.loadFromImage(image);
-    sprite.setTexture(texture);
-    sprite.setScale(SCALE, SCALE);
-    texBaseX = foundX;
-    texBaseY = foundY;
-
-    // 2. PARÁMETROS DE EXPLOSIÓN
-    displayDuration = 0.5f; // La explosión dura 0.6 segundos
-    isActive = true;
-    currentFrame = 0;
-    numFrames = 4;
-
-    // 3. CALCULAR CELDAS DE EXPLOSIÓN (en forma de cruz)
-    int centerGridX = static_cast<int>(centerPosition.x / (TILE_SIZE * SCALE));
-    int centerGridY = static_cast<int>(centerPosition.y / (TILE_SIZE * SCALE));
-
-    explosionCells.push_back({centerGridX, centerGridY}); // Centro
-
-    // Radio de expansión (típicamente 2-3 tiles en Bomberman)
-    int explosionRange = 2;
-
-    // Arriba
-    for (int i = 1; i <= explosionRange; i++) {
-        if (map.getTile(centerGridX, centerGridY - i) == 0) {
-            explosionCells.push_back({centerGridX, centerGridY - i});
-        } else if (map.getTile(centerGridX, centerGridY - i) == 2) {
-            explosionCells.push_back({centerGridX, centerGridY - i});
-            break; // Bloque suave destruye la cadena
-        } else {
-            break; // Pared dura detiene
-        }
-    }
-
-    // Abajo
-    for (int i = 1; i <= explosionRange; i++) {
-        if (map.getTile(centerGridX, centerGridY + i) == 0) {
-            explosionCells.push_back({centerGridX, centerGridY + i});
-        } else if (map.getTile(centerGridX, centerGridY + i) == 2) {
-            explosionCells.push_back({centerGridX, centerGridY + i});
-            break;
-        } else {
-            break;
-        }
-    }
-
-    // Izquierda
-    for (int i = 1; i <= explosionRange; i++) {
-        if (map.getTile(centerGridX - i, centerGridY) == 0) {
-            explosionCells.push_back({centerGridX - i, centerGridY});
-        } else if (map.getTile(centerGridX - i, centerGridY) == 2) {
-            explosionCells.push_back({centerGridX - i, centerGridY});
-            break;
-        } else {
-            break;
-        }
-    }
-
-    // Derecha
-    for (int i = 1; i <= explosionRange; i++) {
-        if (map.getTile(centerGridX + i, centerGridY) == 0) {
-            explosionCells.push_back({centerGridX + i, centerGridY});
-        } else if (map.getTile(centerGridX + i, centerGridY) == 2) {
-            explosionCells.push_back({centerGridX + i, centerGridY});
-            break;
-        } else {
-            break;
         }
     }
 }
 
 void Explosion::update() {
-    if (!isActive) return;
+    float time = lifeTimer.getElapsedTime().asSeconds();
+    float progress = time / duration; 
+    int alpha = static_cast<int>(255 * (1.0f - progress)); 
+    if (alpha < 0) alpha = 0;
 
-    // Verificar si la explosión debe desaparecer
-    if (displayTimer.getElapsedTime().asSeconds() > displayDuration) {
-        isActive = false;
-    }
-
-    // Animación
-    if (animClock.getElapsedTime().asSeconds() > 0.1f) {
-        currentFrame++;
-        if (currentFrame >= numFrames) {
-            currentFrame = numFrames - 1; // Quedarse en último frame
-        }
-        animClock.restart();
+    for (auto& segment : fireSegments) {
+        sf::Color c = segment.getFillColor();
+        c.a = alpha;
+        segment.setFillColor(c);
+        segment.scale(0.98f, 0.98f);
     }
 }
 
 void Explosion::draw(sf::RenderWindow& window) {
-    if (!isActive) return;
-
-    int frameStep = 16;
-
-    for (const auto& cell : explosionCells) {
-        float pixelX = cell.x * TILE_SIZE * SCALE;
-        float pixelY = cell.y * TILE_SIZE * SCALE;
-
-        sprite.setPosition(pixelX, pixelY);
-        sprite.setTextureRect(sf::IntRect(texBaseX + (currentFrame * frameStep), texBaseY, 16, 16));
-        window.draw(sprite);
+    for (const auto& segment : fireSegments) {
+        window.draw(segment);
     }
 }
 
+// --- IMPLEMENTACIÓN DE LAS FUNCIONES QUE FALTABAN ---
+
+// Devuelve verdadero mientras la explosión exista.
+// Cuando el tiempo acaba, devuelve falso y el main la borra.
 bool Explosion::isExplosionActive() {
-    return isActive;
+    return lifeTimer.getElapsedTime().asSeconds() <= duration;
 }
 
-bool Explosion::isCellInExplosion(int gridX, int gridY) {
+// Devuelve la lista de coordenadas afectadas
+const std::vector<sf::Vector2i>& Explosion::getExplosionCells() {
+    return explosionCells;
+}
+
+// Verifica si una coordenada específica está siendo quemada (para dañar al jugador)
+bool Explosion::isCellInExplosion(int checkX, int checkY) {
     for (const auto& cell : explosionCells) {
-        if (cell.x == gridX && cell.y == gridY) {
+        if (cell.x == checkX && cell.y == checkY) {
             return true;
         }
     }
     return false;
-}
-
-const std::vector<sf::Vector2i>& Explosion::getExplosionCells() {
-    return explosionCells;
 }

@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <vector>
 #include <sstream>
 #include "Map.h"
@@ -7,52 +8,65 @@
 #include "Explosion.h"
 #include "LoadingScreen.h"
 #include "Menu.h"
+#include <iostream>
 
 int main() {
     sf::RenderWindow window(sf::VideoMode(MAP_WIDTH * TILE_SIZE * SCALE, MAP_HEIGHT * TILE_SIZE * SCALE), "Bomberman II - 1v1");
     window.setFramerateLimit(60);
 
-    // --- PANTALLA DE MENÚ ---
-    Menu menu;
-    if (!menu.run(window)) {
-        return 0; // Salir si el usuario cierra o cancela
-    }
+    // Música de fondo (se reinicia cada vez que volvemos al menú)
+    sf::Music bgMusic;
+    const std::string musicPath = "assets/Musica/Musica Fondo.ogg";
 
-    // --- PANTALLA DE CARGA ---
-    LoadingScreen loadingScreen;
-    sf::Clock loadingTimer;
-    bool isLoading = true;
-    const float LOADING_DURATION = 2.5f; // 2.5 segundos de carga
+    // Bucle principal: mostrar menú -> cargar -> jugar -> regresar al menú cuando termine
+    while (window.isOpen()) {
+        // --- PANTALLA DE MENÚ ---
+        Menu menu;
+        if (!menu.run(window)) {
+            break; // Salir si el usuario cierra o cancela desde el menú
+        }
 
-    while (window.isOpen() && isLoading) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-            // Permitir saltarse la pantalla de carga con SPACE
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Space) {
+        // Iniciar/reiniciar música desde el menú
+        if (!bgMusic.openFromFile(musicPath)) {
+            std::cerr << "No se pudo cargar la música: " << musicPath << std::endl;
+        } else {
+            bgMusic.setLoop(true);
+            bgMusic.play();
+        }
+
+        // --- PANTALLA DE CARGA ---
+        LoadingScreen loadingScreen;
+        sf::Clock loadingTimer;
+        bool isLoading = true;
+        const float LOADING_DURATION = 2.5f; // 2.5 segundos de carga
+
+        while (window.isOpen() && isLoading) {
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed)
+                    window.close();
+                // Permitir saltarse la pantalla de carga con SPACE
+                if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Space) {
+                    isLoading = false;
+                }
+            }
+
+            if (loadingTimer.getElapsedTime().asSeconds() >= LOADING_DURATION) {
                 isLoading = false;
             }
+
+            window.clear();
+            loadingScreen.update(window.getSize().x, window.getSize().y);
+            loadingScreen.draw(window);
+            window.display();
         }
 
-        if (loadingTimer.getElapsedTime().asSeconds() >= LOADING_DURATION) {
-            isLoading = false;
-        }
+        if (!window.isOpen()) break;
 
-        window.clear();
-        loadingScreen.update(window.getSize().x, window.getSize().y);
-        loadingScreen.draw(window);
-        window.display();
-    }
-
-    if (!window.isOpen()) {
-        return 0;
-    }
-
-    // --- INICIALIZACIÓN DEL JUEGO ---
-    Map gameMap;
-    Player player1(0); // Jugador 1 - Flechas
-    Player player2(1); // Jugador 2 - WASD
+        // --- INICIALIZACIÓN DEL JUEGO ---
+        Map gameMap;
+        Player player1(0); // Jugador 1 - Flechas
+        Player player2(1); // Jugador 2 - WASD
     
     std::vector<Bomb> bombs;
     std::vector<Explosion> explosions;
@@ -63,29 +77,38 @@ int main() {
     // Fuente para texto (game over)
     sf::Font font;
     // Intentar cargar una fuente (puede fallar, pero lo intentamos)
-    bool fontLoaded = font.loadFromFile("assets/font.ttf");
+    bool fontLoaded = font.loadFromFile("assets/Bomber Balloon.ttf");
     if (!fontLoaded) {
         // Si no existe font.ttf, intentar con otras rutas comunes
         fontLoaded = font.loadFromFile("C:\\Windows\\Fonts\\arial.ttf");
     }
 
-    bool gameOver = false;
-    int winner = -1; // -1 = ninguno, 0 = jugador 1, 1 = jugador 2
+        bool gameOver = false;
+        int winner = -1; // -1 = ninguno, 0 = jugador 1, 1 = jugador 2
 
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-            // ESC para reiniciar
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
-                if (gameOver) {
+        // Bucle de la partida
+        bool returnToMenu = false;
+        while (window.isOpen()) {
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed)
                     window.close();
+
+                // Si estamos en pantalla de game over: ESC sale del juego, SPACE/ENTER vuelve al menú
+                if (event.type == sf::Event::KeyPressed && gameOver) {
+                    if (event.key.code == sf::Keyboard::Escape) {
+                        window.close();
+                    } else if (event.key.code == sf::Keyboard::Space || event.key.code == sf::Keyboard::Enter) {
+                        // Volver al menú: detener la música y marcar retorno
+                        if (bgMusic.getStatus() == sf::Music::Playing) bgMusic.stop();
+                        returnToMenu = true;
+                    }
                 }
             }
-        }
 
-        if (!gameOver) {
+            if (returnToMenu) break;
+
+            if (!gameOver) {
             // --- INPUT BOMBAS ---
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
                 if (bomb1Cooldown.getElapsedTime().asSeconds() > 0.5f && player1.getIsAlive()) {
@@ -208,9 +231,9 @@ int main() {
                 restartText.setFont(font);
                 restartText.setCharacterSize(16);
                 restartText.setFillColor(sf::Color::Yellow);
-                restartText.setString("Press ESC to exit");
+                restartText.setString("Press SPACE to return to menu (ESC to exit)");
                 restartText.setPosition(
-                    MAP_WIDTH * TILE_SIZE * SCALE / 2 - 80,
+                    MAP_WIDTH * TILE_SIZE * SCALE / 2 - 160,
                     MAP_HEIGHT * TILE_SIZE * SCALE / 2 + 50
                 );
                 window.draw(restartText);
@@ -218,6 +241,7 @@ int main() {
         }
 
         window.display();
+    }
     }
     return 0;
 }

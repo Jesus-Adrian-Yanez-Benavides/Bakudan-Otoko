@@ -1,12 +1,16 @@
 #include "Player.h"
 #include "Map.h"
 #include <iostream>
-#include <cmath> // Para abs()
+#include <cmath> // Para abs() y sqrt()
 
 Player::Player(int id) : playerId(id) {
     health = 1;
     isAlive = true;
     speed = 4.0f; 
+
+    // --- NUEVO: INICIALIZAR ESTADÍSTICAS ---
+    maxBombs = 1;       // Empiezas poniendo 1 bomba
+    explosionRange = 2; // Rango de 2 bloques
 
     sf::Image image;
     if (!image.loadFromFile("assets/NES-Bomberman-II-Miscellaneous-Bomberman-_-Enemies.png")) {
@@ -17,6 +21,7 @@ Player::Player(int id) : playerId(id) {
     texture.loadFromImage(image);
     sprite.setTexture(texture);
 
+    // TUS COORDENADAS ORIGINALES
     sprite.setTextureRect(sf::IntRect(10, 3, 17, 24)); 
     sprite.setOrigin(8.5f, 12.0f);
 
@@ -25,8 +30,11 @@ Player::Player(int id) : playerId(id) {
         // Jugador 1 en esquina superior izquierda
         sprite.setPosition(1.5f * TILE_SIZE * SCALE, 1.5f * TILE_SIZE * SCALE);
     } else {
-        // Jugador 2: mover una celda a la derecha y una celda hacia abajo respecto a la esquina
+        // Jugador 2: esquina inferior derecha
         sprite.setPosition((MAP_WIDTH - 1.5f) * TILE_SIZE * SCALE, (MAP_HEIGHT - 1.5f) * TILE_SIZE * SCALE);
+        
+        // Opcional: Darle un tinte rojo al J2 para diferenciarlo
+        // sprite.setColor(sf::Color(255, 200, 200)); 
     }
     
     sprite.setScale(SCALE, SCALE); 
@@ -56,7 +64,6 @@ void Player::update(Map& map) {
             isMoving = false; // Dejamos de caminar
         } else {
             // Normalizar dirección y mover
-            // Como movemos en linea recta ortogonal, basta con sumar speed
             if (direction.x > 0) sprite.move(speed, 0);
             else if (direction.x < 0) sprite.move(-speed, 0);
             else if (direction.y > 0) sprite.move(0, speed);
@@ -80,48 +87,16 @@ void Player::update(Map& map) {
         // Controles diferentes según el ID del jugador
         if (playerId == 0) {
             // Jugador 1: Flechas
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
-                nextStep.y = -TILE_SIZE * SCALE;
-                currentDir = UP;
-                keyPressed = true;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
-                nextStep.y = TILE_SIZE * SCALE;
-                currentDir = DOWN;
-                keyPressed = true;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
-                nextStep.x = -TILE_SIZE * SCALE;
-                currentDir = LEFT;
-                keyPressed = true;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
-                nextStep.x = TILE_SIZE * SCALE;
-                currentDir = RIGHT;
-                keyPressed = true;
-            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) { nextStep.y = -TILE_SIZE * SCALE; currentDir = UP; keyPressed = true; }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) { nextStep.y = TILE_SIZE * SCALE; currentDir = DOWN; keyPressed = true; }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) { nextStep.x = -TILE_SIZE * SCALE; currentDir = LEFT; keyPressed = true; }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) { nextStep.x = TILE_SIZE * SCALE; currentDir = RIGHT; keyPressed = true; }
         } else {
             // Jugador 2: WASD
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-                nextStep.y = -TILE_SIZE * SCALE;
-                currentDir = UP;
-                keyPressed = true;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-                nextStep.y = TILE_SIZE * SCALE;
-                currentDir = DOWN;
-                keyPressed = true;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-                nextStep.x = -TILE_SIZE * SCALE;
-                currentDir = LEFT;
-                keyPressed = true;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-                nextStep.x = TILE_SIZE * SCALE;
-                currentDir = RIGHT;
-                keyPressed = true;
-            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) { nextStep.y = -TILE_SIZE * SCALE; currentDir = UP; keyPressed = true; }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { nextStep.y = TILE_SIZE * SCALE; currentDir = DOWN; keyPressed = true; }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) { nextStep.x = -TILE_SIZE * SCALE; currentDir = LEFT; keyPressed = true; }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) { nextStep.x = TILE_SIZE * SCALE; currentDir = RIGHT; keyPressed = true; }
         }
 
         // Si se presionó algo, verificamos si es válido moverse ahí
@@ -139,8 +114,6 @@ void Player::update(Map& map) {
             if (map.getTile(gridX, gridY) == 0) {
                 targetPosition = potentialTarget; // Fijamos destino
                 isMoving = true; // Iniciamos viaje
-            } else {
-                // Si es pared, no hacemos nada (se queda quieto mirando a la pared)
             }
         } else {
             // Si no presiona nada, reseteamos a frame quieto
@@ -225,4 +198,31 @@ void Player::takeDamage() {
 void Player::setPosition(sf::Vector2f newPos) {
     sprite.setPosition(newPos);
     targetPosition = newPos;
+}
+
+// --- NUEVO: IMPLEMENTACIÓN DE POWER UPS ---
+
+void Player::addPowerUp(int type) {
+    if (type == 0) { // Fuego (Fire Up)
+        explosionRange++;
+        std::cout << "P" << playerId+1 << " Fire Up! Range: " << explosionRange << std::endl;
+    } 
+    else if (type == 1) { // Bomba (Bomb Up)
+        maxBombs++;
+        std::cout << "P" << playerId+1 << " Bomb Up! Max: " << maxBombs << std::endl;
+    } 
+    else if (type == 2) { // Velocidad (Speed Up)
+        // Aumentamos velocidad asegurando que sea divisor de 48 para no romper el grid
+        // 4.0 -> 6.0 -> 8.0 -> 12.0
+        if (speed < 12.0f) speed += 2.0f; 
+        std::cout << "P" << playerId+1 << " Speed Up! Speed: " << speed << std::endl;
+    }
+}
+
+int Player::getMaxBombs() {
+    return maxBombs;
+}
+
+int Player::getExplosionRange() {
+    return explosionRange;
 }
